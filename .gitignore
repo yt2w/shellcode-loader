@@ -1,0 +1,36 @@
+# Binaries
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Shellcode files - DO NOT COMMIT PAYLOADS
+*.bin
+shellcode.h
+
+# Build artifacts
+x64/
+Debug/
+Release/
+.vs/
+
+# Debug output
+debug.log
+*.log
+
+# IDE
+.vscode/
+*.suo
+*.user
+*.sln.docstates
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp
+*.tmp
+*.bak
