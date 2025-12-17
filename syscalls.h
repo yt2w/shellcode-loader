@@ -124,4 +124,33 @@ extern "C" {
         HANDLE ProcessHandle,
         NTSTATUS ExitStatus
     );
+    
+    // === UNHOOK FEATURE SYSCALLS ===
+    
+    NTSTATUS SysNtOpenSection(
+        PVOID gadget, DWORD ssn,
+        PHANDLE SectionHandle,
+        ACCESS_MASK DesiredAccess,
+        POBJECT_ATTRIBUTES ObjectAttributes
+    );
+    
+    NTSTATUS SysNtMapViewOfSection(
+        PVOID gadget, DWORD ssn,
+        HANDLE SectionHandle,
+        HANDLE ProcessHandle,
+        PVOID* BaseAddress,
+        ULONG_PTR ZeroBits,
+        SIZE_T CommitSize,
+        PLARGE_INTEGER SectionOffset,
+        PSIZE_T ViewSize,
+        DWORD InheritDisposition,
+        ULONG AllocationType,
+        ULONG Win32Protect
+    );
+    
+    NTSTATUS SysNtUnmapViewOfSection(
+        PVOID gadget, DWORD ssn,
+        HANDLE ProcessHandle,
+        PVOID BaseAddress
+    );
 }
