@@ -8,9 +8,19 @@
 
 #pragma comment(lib, "ntdll.lib")
 
-#define CFG_UNHOOK      0
+// Compiler generates memset for struct = {0} initializations
+// Must provide with C linkage for linker to resolve
+#pragma function(memset)
+extern "C" void* __cdecl memset(void* dst, int val, size_t sz) {
+    unsigned char* p = (unsigned char*)dst;
+    while (sz--) *p++ = (unsigned char)val;
+    return dst;
+}
+
+
+#define CFG_UNHOOK      1
 #define CFG_ANTIDEBUG   1
-#define CFG_DELAY       0
+#define CFG_DELAY       1
 #define CFG_SPOOF       1
 #define CFG_STOMP       1
 #define CFG_DEBUG       0
@@ -34,6 +44,22 @@ __forceinline void VolatileZero(void* ptr, size_t sz) {
     volatile char* p = (volatile char*)ptr;
     while (sz--) *p++ = 0;
 }
+// CRT replacements to avoid msvcrt dependency (OPSEC: smaller import table)
+__forceinline void* MemSet(void* dst, int val, size_t sz) {
+    unsigned char* p = (unsigned char*)dst;
+    while (sz--) *p++ = (unsigned char)val;
+    return dst;
+}
+
+__forceinline size_t WcsLen(const wchar_t* s) {
+    size_t len = 0;
+    while (*s++) len++;
+    return len;
+}
+
+// Redirect standard calls to our implementations
+#define wcslen WcsLen
+
 
 __forceinline int WcsCmpI(const wchar_t* a, const wchar_t* b) {
     while (*a && *b) {
