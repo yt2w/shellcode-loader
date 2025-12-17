@@ -134,7 +134,6 @@ Edit defines in `loader.cpp`:
 | NtReadVirtualMemory | Memory read |
 | NtDelayExecution | Sleep |
 | NtOpenProcessToken | Token access |
-| NtTerminateProcess | Process termination |
 
 ## Detection Considerations
 
