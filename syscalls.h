@@ -2,32 +2,14 @@
 #include <windows.h>
 #include <winternl.h>
 
-// Missing type definitions
+// CLIENT_ID may already be defined in winternl.h
+#ifndef _CLIENT_ID_DEFINED
+#define _CLIENT_ID_DEFINED
 typedef struct _CLIENT_ID {
     HANDLE UniqueProcess;
     HANDLE UniqueThread;
 } CLIENT_ID, *PCLIENT_ID;
-
-// Syscall Number Table - Populated at runtime via Halo's Gate
-struct SyscallTable {
-    DWORD NtClose;
-    DWORD NtOpenProcess;
-    DWORD NtAllocateVirtualMemory;
-    DWORD NtFreeVirtualMemory;
-    DWORD NtProtectVirtualMemory;
-    DWORD NtWriteVirtualMemory;
-    DWORD NtReadVirtualMemory;
-    DWORD NtQueryVirtualMemory;
-    DWORD NtCreateThreadEx;
-    DWORD NtWaitForSingleObject;
-    DWORD NtDelayExecution;
-    DWORD NtQueryInformationProcess;
-    DWORD NtOpenProcessToken;
-    DWORD NtTerminateProcess;
-};
-
-extern SyscallTable g_Syscalls;
-extern PVOID g_SyscallGadget;
+#endif
 
 // External ASM stubs - all take (gadget, ssn, ...) as first two params
 extern "C" {
