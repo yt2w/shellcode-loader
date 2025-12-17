@@ -1,17 +1,11 @@
 #pragma once
-#include <windows.h>
-#include <winternl.h>
 
-// CLIENT_ID may already be defined in winternl.h
-#ifndef _CLIENT_ID_DEFINED
-#define _CLIENT_ID_DEFINED
-typedef struct _CLIENT_ID {
-    HANDLE UniqueProcess;
-    HANDLE UniqueThread;
-} CLIENT_ID, *PCLIENT_ID;
-#endif
+// No includes - loader.cpp includes windows.h/winternl.h before this header
+// Forward declaration for CLIENT_ID pointer
+struct _CLIENT_ID;
+typedef struct _CLIENT_ID* PCLIENT_ID;
 
-// External ASM stubs - all take (gadget, ssn, ...) as first two params
+// External ASM stubs - (gadget, ssn, ...) calling convention
 extern "C" {
     NTSTATUS SysNtClose(
         PVOID gadget, DWORD ssn,
