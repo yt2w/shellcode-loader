@@ -33,10 +33,13 @@ def generate_header(data: bytes, key: int, output: str) -> None:
     lines.append("")
     lines.append("#pragma once")
     lines.append("")
+    # Provide both naming conventions for compatibility
     lines.append(f"#define SHELLCODE_SIZE {len(data)}")
     lines.append(f"#define SHELLCODE_KEY 0x{key:08X}U")
+    lines.append(f"unsigned int shellcode_len = {len(data)};")
+    lines.append(f"unsigned int xor_key = 0x{key:08X}U;")
     lines.append("")
-    lines.append("static const unsigned char SHELLCODE[] = {")
+    lines.append("unsigned char shellcode[] = {")
     
     for i in range(0, len(encrypted), 16):
         chunk = encrypted[i:i+16]
