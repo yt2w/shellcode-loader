@@ -152,11 +152,41 @@ loader.exe
 
 ## Troubleshooting
 
-If no callback:
-1. Set `CFG_DEBUG 1` in loader.cpp
-2. Rebuild
-3. Run loader.exe
-4. Check `debug.log` for errors
+### No Callback Received
+
+1. **Enable debug logging:**
+   - Set `CFG_DEBUG 1` in `loader.cpp`
+
+2. **Rebuild with CRT support:**
+```batch
+   ml64 /c /Fo syscalls.obj syscalls.asm
+   cl /c /O2 /MT /GS- loader.cpp
+   link /OUT:loader.exe /SUBSYSTEM:CONSOLE loader.obj syscalls.obj ntdll.lib
+```
+   
+   > **Note:** The `/MT` flag statically links the C Runtime Library (CRT), which is required for debug logging functions like `fopen_s` and `fclose`.
+
+3. **If you encounter linker errors (LNK2019)**, add additional libraries:
+```batch
+   link /OUT:loader.exe /SUBSYSTEM:CONSOLE loader.obj syscalls.obj ntdll.lib kernel32.lib ucrt.lib libcmt.lib
+```
+
+4. **Run the loader and check logs:**
+```batch
+   loader.exe
+```
+   Check `debug.log` for detailed error messages.
+
+5. **Before production use:**
+   - Set `CFG_DEBUG 0` in `loader.cpp`
+   - Rebuild without `/MT` flag for minimal footprint
+   - Debug builds are larger and more detectable
+
+### Common Issues
+
+- **CRT linking errors:** Enable debug mode requires CRT support via `/MT` flag
+- **Missing libraries:** Add `kernel32.lib ucrt.lib libcmt.lib` if basic linking fails
+- **Large binary size:** Debug builds include CRT; disable for operational use
 
 ## License
 
